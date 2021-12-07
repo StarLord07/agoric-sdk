@@ -257,12 +257,13 @@ const startGovernedLoC = async (
  * @param { Account } detail.account
  * @param { bigint } detail.collateral
  * @param { bigint } detail.runWanted
- * @param { [bigint, bigint] } detail.price
- * @param { [bigint, bigint] } detail.rate
+ * @param { Rational } detail.price
+ * @param { Rational } detail.rate
  * @param { boolean } [detail.failAttestation]
  * @param { boolean } [detail.failOffer]
  * @param { (faker: StartFaker['publicFacet'], bldBrand: Brand) => Promise<[Amount, Payment]> } [mockAttestation]
  * @typedef {ReturnType<typeof import('./attestationFaker.js').start>} StartFaker
+ * @typedef { [bigint, bigint] } Rational
  */
 const testLoC = (
   title,
@@ -380,6 +381,41 @@ test('parse test data from spreadsheet', async t => {
   t.deepEqual(rows[1].slice(1, 2), ['500%']);
   t.deepEqual(rows[7].slice(2, 4), ['Starting LoC', '0,0 -> 100,6000']);
 });
+
+const makeTestCases = async () => {
+  const cases = await asset('./test-runLoC-cases.csv');
+  const rows = await load(cases, { readFile: fsp.readFile }).then(csvParse);
+
+  rows.foreach(
+    ([
+      _a,
+      _b,
+      num,
+      description,
+      _e,
+      _f,
+      rateBefore,
+      rateAfter,
+      runBefore,
+      runDelta,
+      _k,
+      staked,
+      lienedBefore,
+      lienedDelta,
+    ]) => {
+      const ratePct = BigInt(
+        (rateAfter.length > 0 ? rateAfter : rateBefore).replace(/%$/, ''),
+      );
+      testLoC(`${num} ${description}`, {
+        runWanted: BigInt(runBefore) + BigInt(runDelta),
+        collateral: 6000n,
+        account: { total: 1n, bonded: BigInt(staked), locked: 0n },
+        price: [125n, 100n],
+        rate: [ratePct, 100n],
+      });
+    },
+  );
+};
 
 testLoC('borrow 100 RUN against 6000 BLD at 1.25, 5x', {
   runWanted: 100n,
