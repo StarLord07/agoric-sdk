@@ -13,9 +13,14 @@ export const PROTOCOL_FEE_KEY = 'ProtocolFee';
 const POOL_FEE_BP = 24n;
 const PROTOCOL_FEE_BP = 6n;
 
-/** @type {(poolFeeBP: bigint, protocolFeeBP: bigint) => ParamManagerFull} */
-const makeParamManager = async (poolFeeBP, protocolFeeBP) => {
-  const builder = makeParamManagerBuilder()
+/** @type {MakeAmmParamManager} */
+const makeParamManager = async (
+  zoe,
+  poolFeeBP,
+  protocolFeeBP,
+  poserInvitation,
+) => {
+  const builder = makeParamManagerBuilder(zoe)
     .addNat(POOL_FEE_KEY, poolFeeBP)
     .addNat(PROTOCOL_FEE_KEY, protocolFeeBP);
 
@@ -35,7 +40,20 @@ const makeAmmParams = (
   });
 };
 
-harden(makeAmmParams);
-harden(makeParamManager);
+const makeAmmTerms = (
+  timer,
+  poserInvitationAmount,
+  protocolFeeBP = PROTOCOL_FEE_BP,
+  poolFeeBP = POOL_FEE_BP,
+) => ({
+  timer,
+  poolFeeBP,
+  protocolFeeBP,
+  main: makeAmmParams(poserInvitationAmount, protocolFeeBP, poolFeeBP),
+});
 
-export { makeAmmParams, makeParamManager };
+harden(makeParamManager);
+harden(makeAmmTerms);
+harden(makeAmmParams);
+
+export { makeParamManager, makeAmmTerms, makeAmmParams };
