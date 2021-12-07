@@ -10,10 +10,12 @@ import bundleSource from '@agoric/bundle-source';
 import { AmountMath, AssetKind, makeIssuerKit } from '@agoric/ertp';
 import { makeRatio } from '@agoric/zoe/src/contractSupport/index.js';
 import buildManualTimer from '@agoric/zoe/tools/manualTimer.js';
+import fsp from 'fs/promises';
 // import { makeLoopback } from '@agoric/captp';
 
 import { ParamType } from '@agoric/governance';
 import { CreditTerms } from '../src/runLoC.js';
+import { csvParse } from './csvParse.js';
 
 /**
  * @typedef { import('@agoric/eventual-send').Unpromise<T> } Unpromise<T>
@@ -52,6 +54,7 @@ const allValues = async obj =>
 
 const asset = async ref =>
   new URL(await metaResolve(ref, import.meta.url)).pathname;
+const load = (path, { readFile }) => readFile(path, 'utf-8');
 
 const contractRoots = {
   runLoC: '../src/runLoC.js',
@@ -369,6 +372,14 @@ const testLoC = (
     t.deepEqual(await E(runIssuer).getAmountOf(p.RUN), run(runWanted));
   });
 };
+
+test('parse test data from spreadsheet', async t => {
+  const cases = await asset('./test-runLoC-cases.csv');
+  const rows = await load(cases, { readFile: fsp.readFile }).then(csvParse);
+  t.deepEqual(rows[0].slice(0, 4), ['', '', '', '']);
+  t.deepEqual(rows[1].slice(1, 2), ['500%']);
+  t.deepEqual(rows[7].slice(2, 4), ['Starting LoC', '0,0 -> 100,6000']);
+});
 
 testLoC('borrow 100 RUN against 6000 BLD at 1.25, 5x', {
   runWanted: 100n,
