@@ -313,7 +313,7 @@ const testLoC = (
     const ubld = value => AmountMath.make(bldBrand, value);
 
     // @ts-ignore governance wrapper obscures publicFace type :-/
-    const lineOfCreditInvitation = await E(publicFacet).getInvitation();
+    const lineOfCreditInvitation = await E(publicFacet).makeLoanInvitation();
 
     // Get an attestation (amount, payment)
     const addr = 'address1';
@@ -330,7 +330,7 @@ const testLoC = (
       return;
     }
     /** @returns { Promise<[Amount, Payment]> } */
-    const getReturnableAttestation = async () =>
+    const getReturnableAttestation = () =>
       E.get(tryAttestations).returnable.then(pmt =>
         E(attIssuer)
           .getAmountOf(pmt)
@@ -361,12 +361,10 @@ const testLoC = (
     }
     const resultValue = await result;
     t.log({ resultValue });
-    t.regex(resultValue, /^borrowed /);
-
-    t.true(await E(seat).hasExited());
+    t.deepEqual(keys(resultValue), ['invitationMakers', 'uiNotifier', 'vault']);
 
     // attPmt is spent
-    t.throwsAsync(E(attIssuer).getAmountOf(attPmt));
+    await t.throwsAsync(E(attIssuer).getAmountOf(attPmt));
 
     const p = await allValues(await E(seat).getPayouts());
     t.log('payout', p);
