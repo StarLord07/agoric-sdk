@@ -9,9 +9,10 @@ import stablecoinBundle from './bundle-stablecoinMachine.js';
 import contractGovernorBundle from './bundle-contractGovernor.js';
 import noActionElectorateBundle from './bundle-noActionElectorate.js';
 import binaryVoteCounterBundle from './bundle-binaryVoteCounter.js';
-import { governedParameterTerms } from '../src/params';
+import { makeGovernedTerms } from '../src/params';
 import { Far } from '@agoric/marshal';
 import { makeParamManager } from '@agoric/zoe/src/contracts/vpool-xyk-amm/params';
+import { makeRatio } from '@agoric/zoe/src/contractSupport';
 
 const SECONDS_PER_HOUR = 60n * 60n;
 const SECONDS_PER_DAY = 24n * SECONDS_PER_HOUR;
@@ -177,14 +178,36 @@ export async function installOnChain({
     recordingPeriod: SECONDS_PER_DAY,
   };
 
-  const treasuryTerms = harden({
-    liquidationInstall,
+  const poserInvitationP = E(electorateCreatorFacet).getPoserInvitation();
+  const [initialPoserInvitation, invitationAmount] = await Promise.all([
+    poserInvitationP,
+    E(E(zoe).getInvitationIssuer()).getAmountOf(poserInvitationP),
+  ]);
+
+  const centralIssuerP = E(zoeWPurse).getFeeIssuer();
+  const [centralIssuer, centralBrand] = await Promise.all([
+    centralIssuerP,
+    E(centralIssuerP).getBrand(),
+  ]);
+
+  // declare governed params for the treasury; addVaultType() sets actual rates
+  const rates = {
+    initialMargin: makeRatio(120n, centralBrand),
+    liquidationMargin: makeRatio(105n, centralBrand),
+    interestRate: makeRatio(250n, centralBrand, BASIS_POINTS),
+    loanFee: makeRatio(200n, centralBrand, BASIS_POINTS),
+  }
+
+  const treasuryTerms = makeGovernedTerms(
     priceAuthority,
     loanParams,
-    timerService: chainTimerService,
-    governedParams: governedParameterTerms,
+    liquidationInstall,
+    chainTimerService,
+    invitationAmount,
+    rates,
+    amm.ammPublicFacet,
     bootstrapPaymentValue,
-  });
+  );
   const governorTerms = harden({
     timer: chainTimerService,
     electorateInstance,
@@ -192,7 +215,7 @@ export async function installOnChain({
     governed: {
       terms: treasuryTerms,
       issuerKeywordRecord: {},
-      privateArgs: harden({ feeMintAccess }),
+      privateArgs: harden({ feeMintAccess, initialPoserInvitation }),
     },
   });
 
@@ -209,8 +232,8 @@ export async function installOnChain({
   const [
     invitationIssuer,
     {
-      issuers: { Governance: govIssuer, RUN: centralIssuer },
-      brands: { Governance: govBrand, RUN: centralBrand },
+      issuers: { Governance: govIssuer },
+      brands: { Governance: govBrand },
     },
     treasuryCreator,
   ] = await Promise.all([
